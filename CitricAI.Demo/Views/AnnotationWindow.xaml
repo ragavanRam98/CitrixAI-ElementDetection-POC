@@ -1,0 +1,43 @@
+﻿<Window x:Class="CitrixAI.Demo.Views.AnnotationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Image Annotation Tool" Height="700" Width="900"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <ToolBar Grid.Row="0">
+            <Button Name="SaveAnnotationsButton" Content="Save Annotations" Click="SaveAnnotations_Click"/>
+            <Button Name="LoadAnnotationsButton" Content="Load Annotations" Click="LoadAnnotations_Click"/>
+            <Separator/>
+            <Button Name="AddRectangleButton" Content="Add Rectangle" Click="AddRectangle_Click"/>
+            <Button Name="ClearAnnotationsButton" Content="Clear All" Click="ClearAnnotations_Click"/>
+            <Separator/>
+            <TextBlock Text="Element Type:" VerticalAlignment="Center"/>
+            <ComboBox Name="ElementTypeComboBox" Width="100" Margin="5,0">
+                <ComboBoxItem Content="Button" IsSelected="True"/>
+                <ComboBoxItem Content="TextBox"/>
+                <ComboBoxItem Content="Label"/>
+                <ComboBoxItem Content="Dropdown"/>
+                <ComboBoxItem Content="Checkbox"/>
+            </ComboBox>
+        </ToolBar>
+
+        <!-- Image Display -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Canvas Name="AnnotationCanvas" Background="White">
+                <Image Name="AnnotationImage" MouseLeftButtonDown="AnnotationImage_MouseLeftButtonDown"/>
+            </Canvas>
+        </ScrollViewer>
+
+        <!-- Status -->
+        <StatusBar Grid.Row="2">
+            <TextBlock Name="StatusText" Text="Click and drag to create annotations"/>
+        </StatusBar>
+    </Grid>
+</Window>
