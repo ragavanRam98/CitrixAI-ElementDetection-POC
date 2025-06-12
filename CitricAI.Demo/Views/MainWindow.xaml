@@ -63,12 +63,17 @@
                 </StackPanel>
 
                 <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Name="ImageScrollViewer"
+                  HorizontalScrollBarVisibility="Auto" 
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  CanContentScroll="False">
                         <Canvas Name="ImageCanvas" Background="White">
                             <Image Name="SourceImage" 
-                                   Source="{Binding CurrentImage}" 
-                                   Stretch="None"
-                                   MouseLeftButtonDown="SourceImage_MouseLeftButtonDown"/>
+                   Source="{Binding CurrentImage}" 
+                   Stretch="None"
+                   MouseLeftButtonDown="SourceImage_MouseLeftButtonDown"/>
 
                             <!-- Detected Elements Overlay -->
                             <ItemsControl ItemsSource="{Binding DetectedElements}">
@@ -86,24 +91,15 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Width="{Binding BoundingBox.Width}" 
-                                                Height="{Binding BoundingBox.Height}"
-                                                BorderBrush="{Binding HighlightColor}" 
-                                                BorderThickness="2"
-                                                Background="Transparent">
+                                Height="{Binding BoundingBox.Height}"
+                                BorderBrush="{Binding HighlightColor}" 
+                                BorderThickness="2"
+                                Background="Transparent">
                                             <Border.ToolTip>
                                                 <StackPanel>
-                                                    <TextBlock>
-                                                        <Run Text="Type: "/>
-                                                        <Run Text="{Binding ElementType}"/>
-                                                    </TextBlock>
-                                                    <TextBlock>
-                                                        <Run Text="Confidence: "/>
-                                                        <Run Text="{Binding Confidence, StringFormat=F2}"/>
-                                                    </TextBlock>
-                                                    <TextBlock>
-                                                        <Run Text="Text: "/>
-                                                        <Run Text="{Binding Text}"/>
-                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding ElementType, StringFormat='Type: {0}'}"/>
+                                                    <TextBlock Text="{Binding Confidence, StringFormat='Confidence: {0:F2}'}"/>
+                                                    <TextBlock Text="{Binding Text, StringFormat='Text: {0}'}"/>
                                                 </StackPanel>
                                             </Border.ToolTip>
                                         </Border>

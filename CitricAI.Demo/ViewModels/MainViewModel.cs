@@ -54,14 +54,15 @@ namespace CitrixAI.Demo.ViewModels
         /// </summary>
         public MainViewModel()
         {
+            LogOutput = "CitrixAI Element Detection POC\n" +
+           "================================\n";
+
             InitializeCommands();
-            InitializeDetectionSystem();
+            InitializeDetectionSystem(); // Now log messages will be preserved
             InitializeCollections();
 
             StatusMessage = "Ready - Load an image or capture screenshot to begin";
-            LogOutput = "CitrixAI Element Detection POC\n" +
-                       "================================\n" +
-                       "System initialized and ready for detection.\n\n";
+            LogMessage("System initialized and ready for detection.");
         }
 
         #endregion
@@ -313,8 +314,62 @@ namespace CitrixAI.Demo.ViewModels
 
         private async Task RunAIDetectionAsync()
         {
-            LogMessage("AI detection will be implemented in POC Day 2");
-            await Task.CompletedTask;
+            if (CurrentImage == null)
+            {
+                LogMessage("No image loaded. Please load an image or capture a screenshot first.");
+                return;
+            }
+
+            try
+            {
+                IsProcessing = true;
+                StatusMessage = "Running AI detection...";
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+                // Get AI strategy specifically
+                var aiStrategy = _detectionOrchestrator.GetRegisteredStrategies()
+                    .FirstOrDefault(s => s.StrategyId == "AI_Detection");
+
+                if (aiStrategy == null)
+                {
+                    LogMessage("AI Detection strategy not available");
+                    StatusMessage = "AI Detection not available";
+                    return;
+                }
+
+                // Convert BitmapImage to Bitmap for detection
+                var bitmap = ConvertBitmapImageToBitmap(CurrentImage);
+
+                // Create AI-specific detection context
+                var context = DetectionContext.ForAIDetection(
+                    bitmap,
+                    new[] { ElementType.Button, ElementType.TextBox, ElementType.Label, ElementType.Dropdown },
+                    ConfidenceThreshold);
+
+                // Run AI detection only
+                var result = await aiStrategy.DetectAsync(context);
+
+                stopwatch.Stop();
+                DetectionTime = stopwatch.Elapsed.TotalMilliseconds;
+
+                // Process results
+                ProcessDetectionResult(result);
+
+                LogMessage($"AI Detection completed in {DetectionTime:F0}ms");
+                LogMessage($"Found {result.DetectedElements.Count} elements with confidence {result.OverallConfidence:F2}");
+
+                StatusMessage = $"AI Detection completed - {result.DetectedElements.Count} elements found";
+            }
+            catch (Exception ex)
+            {
+                LogError($"AI Detection failed: {ex.Message}");
+                StatusMessage = "AI Detection failed";
+            }
+            finally
+            {
+                IsProcessing = false;
+            }
         }
 
         private async Task RunAllStrategiesAsync()
@@ -415,20 +470,64 @@ namespace CitrixAI.Demo.ViewModels
 
         private void InitializeDetectionSystem()
         {
+            LogMessage("Starting detection system initialization...");
             try
             {
                 _detectionOrchestrator = new DetectionOrchestrator();
                 _screenshotCapture = new ScreenshotCapture();
 
-                // Register basic template matching strategy for Day 1
-                var templateStrategy = new TemplateMatchingStrategy();
-                _detectionOrchestrator.RegisterStrategy(templateStrategy);
+                LogMessage("Attempting to register AI Detection Strategy...");
+                // Register AI Detection Strategy
+                try
+                {
+                    var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "ui_detection.onnx");
+                    var aiStrategy = new AIDetectionStrategy(modelPath, 0.5, 0.4);
+                    _detectionOrchestrator.RegisterStrategy(aiStrategy);
+                    LogMessage("AI Detection Strategy registered successfully");
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to register AI strategy: {ex.Message}");
+                }
 
-                LogMessage("Detection system initialized with template matching strategy");
+                LogMessage("Attempting to register Template Matching Strategy...");
+                // Register existing Template Matching Strategy
+                try
+                {
+                    var templateStrategy = new TemplateMatchingStrategy();
+                    _detectionOrchestrator.RegisterStrategy(templateStrategy);
+                    LogMessage("Template Matching Strategy registered successfully");
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to register template strategy: {ex.Message}");
+                }
+
+                // Validate registration
+                var registeredStrategies = _detectionOrchestrator.GetRegisteredStrategies();
+                LogMessage($"Detection system initialized with {registeredStrategies.Count} strategies");
+
+                foreach (var strategy in registeredStrategies.OrderByDescending(s => s.Priority))
+                {
+                    LogMessage($"  Strategy: {strategy.Name} (Priority: {strategy.Priority})");
+                }
             }
             catch (Exception ex)
             {
                 LogError($"Failed to initialize detection system: {ex.Message}");
+
+                // Fallback to basic template matching
+                try
+                {
+                    _detectionOrchestrator = new DetectionOrchestrator();
+                    var fallbackStrategy = new TemplateMatchingStrategy();
+                    _detectionOrchestrator.RegisterStrategy(fallbackStrategy);
+                    LogMessage("Fallback: Initialized with template matching only");
+                }
+                catch (Exception fallbackEx)
+                {
+                    LogError($"Fallback initialization failed: {fallbackEx.Message}");
+                }
             }
         }
 
@@ -446,16 +545,33 @@ namespace CitrixAI.Demo.ViewModels
                 bitmap.BeginInit();
                 bitmap.UriSource = new Uri(imagePath);
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
+
+                // Scale large images to fit better in the UI (max 1000x700)
+                using (var tempImage = new Bitmap(imagePath))
+                {
+                    if (tempImage.Width > 1000 || tempImage.Height > 700)
+                    {
+                        // Calculate scale to fit in reasonable display size
+                        double scaleX = 1000.0 / tempImage.Width;
+                        double scaleY = 700.0 / tempImage.Height;
+                        double scale = Math.Min(scaleX, scaleY);
+
+                        bitmap.DecodePixelWidth = (int)(tempImage.Width * scale);
+                        bitmap.DecodePixelHeight = (int)(tempImage.Height * scale);
+
+                        LogMessage($"Scaled large image from {tempImage.Width}x{tempImage.Height} to {bitmap.DecodePixelWidth}x{bitmap.DecodePixelHeight}");
+                    }
+                }
+
                 bitmap.EndInit();
                 bitmap.Freeze();
 
                 CurrentImage = bitmap;
                 CurrentImagePath = Path.GetFileName(imagePath);
 
-                // Calculate image quality
+                // Calculate image quality using original size
                 using (var systemBitmap = new Bitmap(imagePath))
                 {
-                    // Basic quality assessment
                     ImageQuality = Math.Min(1.0, (systemBitmap.Width * systemBitmap.Height) / (800.0 * 600.0));
                 }
 
