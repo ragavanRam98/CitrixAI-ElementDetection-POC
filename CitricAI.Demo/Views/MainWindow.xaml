@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CitrixAI.Demo.ViewModels"
         Title="CitrixAI Element Detection POC" 
-        Height="800" Width="1200"
+        MinWidth="900" MinHeight="700"
         WindowStartupLocation="CenterScreen">
 
     <Window.DataContext>
@@ -43,11 +43,13 @@
         </Menu>
 
         <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="10">
+        <Grid Grid.Row="1" Margin="{StaticResource StandardMargin}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*"/>
+                <!-- Image display area: 3 parts of available width, minimum 450px for usability -->
+                <ColumnDefinition Width="3*" MinWidth="450"/>
                 <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="2*"/>
+                <!-- Results panel: 2 parts of available width, minimum 350px, increased max width -->
+                <ColumnDefinition Width="2*" MinWidth="400" MaxWidth="800"/>
             </Grid.ColumnDefinitions>
 
             <!-- Image Display Area -->
@@ -57,23 +59,23 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="{StaticResource CompactMargin}">
                     <TextBlock Text="Source Image:" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding CurrentImagePath}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding CurrentImagePath}" Margin="{StaticResource StandardMargin}" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1">
                     <ScrollViewer Name="ImageScrollViewer"
-                  HorizontalScrollBarVisibility="Auto" 
-                  VerticalScrollBarVisibility="Auto"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch"
-                  CanContentScroll="False">
+                                  HorizontalScrollBarVisibility="Auto" 
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch"
+                                  CanContentScroll="False">
                         <Canvas Name="ImageCanvas" Background="White">
                             <Image Name="SourceImage" 
-                   Source="{Binding CurrentImage}" 
-                   Stretch="None"
-                   MouseLeftButtonDown="SourceImage_MouseLeftButtonDown"/>
+                                   Source="{Binding CurrentImage}" 
+                                   Stretch="None"
+                                   MouseLeftButtonDown="SourceImage_MouseLeftButtonDown"/>
 
                             <!-- Detected Elements Overlay -->
                             <ItemsControl ItemsSource="{Binding DetectedElements}">
@@ -91,10 +93,10 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Width="{Binding BoundingBox.Width}" 
-                                Height="{Binding BoundingBox.Height}"
-                                BorderBrush="{Binding HighlightColor}" 
-                                BorderThickness="2"
-                                Background="Transparent">
+                                                Height="{Binding BoundingBox.Height}"
+                                                BorderBrush="{Binding HighlightColor}" 
+                                                BorderThickness="2"
+                                                Background="Transparent">
                                             <Border.ToolTip>
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding ElementType, StringFormat='Type: {0}'}"/>
@@ -113,103 +115,129 @@
 
             <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"/>
 
-            <!-- Results Panel -->
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="200"/>
-                </Grid.RowDefinitions>
+            <!-- Results Panel with ScrollViewer Wrapper -->
+            <ScrollViewer Grid.Column="2" 
+                          VerticalScrollBarVisibility="Auto" 
+                          HorizontalScrollBarVisibility="Disabled"
+                          PanningMode="VerticalOnly"
+                          MaxHeight="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}">
+                <StackPanel Margin="{StaticResource CompactMargin}">
 
-                <!-- Detection Controls -->
-                <GroupBox Grid.Row="0" Header="Detection Controls" Margin="0,0,0,10">
-                    <StackPanel Margin="10">
-                        <CheckBox Content="Template Matching" IsChecked="{Binding UseTemplateMatching}" Margin="0,5"/>
-                        <CheckBox Content="Feature Detection" IsChecked="{Binding UseFeatureDetection}" Margin="0,5"/>
-                        <CheckBox Content="AI Detection" IsChecked="{Binding UseAIDetection}" Margin="0,5"/>
-                        <CheckBox Content="OCR" IsChecked="{Binding UseOCR}" Margin="0,5"/>
+                    <!-- Detection Controls with 2x2 UniformGrid -->
+                    <GroupBox Header="Detection Controls" Margin="{StaticResource CompactMargin}">
+                        <StackPanel Margin="{StaticResource StandardMargin}">
+                            <!-- 2x2 UniformGrid for checkboxes with uniform styling -->
+                            <UniformGrid Rows="2" Columns="2" Margin="{StaticResource CompactMargin}">
+                                <UniformGrid.Resources>
+                                    <Style TargetType="CheckBox">
+                                        <Setter Property="Margin" Value="4"/>
+                                    </Style>
+                                </UniformGrid.Resources>
+                                <CheckBox Content="Template Matching" IsChecked="{Binding UseTemplateMatching}"/>
+                                <CheckBox Content="Feature Detection" IsChecked="{Binding UseFeatureDetection}"/>
+                                <CheckBox Content="AI Detection" IsChecked="{Binding UseAIDetection}"/>
+                                <CheckBox Content="OCR" IsChecked="{Binding UseOCR}"/>
+                            </UniformGrid>
 
-                        <Separator Margin="0,10"/>
+                            <Separator Margin="{StaticResource StandardMargin}"/>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,5">
-                            <TextBlock Text="Confidence Threshold:" Width="120" VerticalAlignment="Center"/>
-                            <Slider Name="ConfidenceSlider" 
-                                    Value="{Binding ConfidenceThreshold}" 
-                                    Minimum="0.1" Maximum="1.0" 
-                                    Width="100" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Value, ElementName=ConfidenceSlider, StringFormat=F2}" 
-                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+                            <!-- Threshold and Results controls in Grid -->
+                            <Grid Margin="{StaticResource CompactMargin}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Confidence Threshold:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <Slider Grid.Row="0" Grid.Column="1" Name="ConfidenceSlider" 
+                                        Value="{Binding ConfidenceThreshold}" 
+                                        Minimum="0.1" Maximum="1.0" 
+                                        VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" 
+                                           Text="{Binding Value, ElementName=ConfidenceSlider, StringFormat=F2}" 
+                                           Margin="10,0,0,0" VerticalAlignment="Center" MinWidth="30"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Max Results:" VerticalAlignment="Center" Margin="0,5,10,0"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MaxResults}" 
+                                         VerticalAlignment="Center" Margin="0,5,0,0" MaxWidth="100" HorizontalAlignment="Left"/>
+                            </Grid>
+
+                            <Button Content="Run Detection" 
+                                    Command="{Binding RunDetectionCommand}" 
+                                    Margin="{StaticResource StandardMargin}" 
+                                    Height="30"/>
                         </StackPanel>
+                    </GroupBox>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,5">
-                            <TextBlock Text="Max Results:" Width="120" VerticalAlignment="Center"/>
-                            <TextBox Text="{Binding MaxResults}" Width="60" VerticalAlignment="Center"/>
-                        </StackPanel>
+                    <!-- Results List with improved scrolling -->
+                    <GroupBox Header="Detection Results" Margin="{StaticResource CompactMargin}">
+                        <DataGrid ItemsSource="{Binding DetectionResults}" 
+                                  AutoGenerateColumns="False" 
+                                  CanUserAddRows="False"
+                                  SelectedItem="{Binding SelectedResult}"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.CanContentScroll="False"
+                                  MaxHeight="200"
+                                  MinHeight="120">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Type" Binding="{Binding ElementType}" Width="80" MinWidth="60"/>
+                                <DataGridTextColumn Header="Conf." Binding="{Binding Confidence, StringFormat=F2}" Width="50" MinWidth="45"/>
+                                <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*" MinWidth="100"/>
+                                <DataGridTextColumn Header="Location" Binding="{Binding LocationString}" Width="70" MinWidth="60"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
 
-                        <Button Content="Run Detection" 
-                                Command="{Binding RunDetectionCommand}" 
-                                Margin="0,10,0,0" 
-                                Height="30"/>
-                    </StackPanel>
-                </GroupBox>
+                    <!-- Performance Metrics -->
+                    <GroupBox Header="Performance" Margin="{StaticResource CompactMargin}">
+                        <Grid Margin="{StaticResource StandardMargin}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                <!-- Results List -->
-                <GroupBox Grid.Row="1" Header="Detection Results">
-                    <DataGrid ItemsSource="{Binding DetectionResults}" 
-                              AutoGenerateColumns="False" 
-                              CanUserAddRows="False"
-                              SelectedItem="{Binding SelectedResult}"
-                              GridLinesVisibility="Horizontal">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Type" Binding="{Binding ElementType}" Width="80"/>
-                            <DataGridTextColumn Header="Confidence" Binding="{Binding Confidence, StringFormat=F2}" Width="80"/>
-                            <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*"/>
-                            <DataGridTextColumn Header="Location" Binding="{Binding LocationString}" Width="100"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </GroupBox>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Detection Time:"/>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding DetectionTime, StringFormat=F0}"/>
+                                <TextBlock Text=" ms"/>
+                            </StackPanel>
 
-                <!-- Performance Metrics -->
-                <GroupBox Grid.Row="2" Header="Performance" Margin="0,10,0,0">
-                    <Grid Margin="10">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Elements Found:"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ElementsFound}"/>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Detection Time:"/>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
-                            <TextBlock Text="{Binding DetectionTime, StringFormat=F0}"/>
-                            <TextBlock Text=" ms"/>
-                        </StackPanel>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Image Quality:"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ImageQuality, StringFormat=F2}"/>
+                        </Grid>
+                    </GroupBox>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Elements Found:"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ElementsFound}"/>
+                    <!-- Log Output -->
+                    <GroupBox Header="Log Output" Margin="{StaticResource CompactMargin}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" 
+                                      MaxHeight="150" MinHeight="100">
+                            <TextBox Text="{Binding LogOutput}" 
+                                     IsReadOnly="True" 
+                                     TextWrapping="Wrap"
+                                     Background="Black"
+                                     Foreground="LightGreen"
+                                     FontFamily="Consolas"
+                                     FontSize="10"
+                                     BorderThickness="0"/>
+                        </ScrollViewer>
+                    </GroupBox>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Image Quality:"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ImageQuality, StringFormat=F2}"/>
-                    </Grid>
-                </GroupBox>
-
-                <!-- Log Output -->
-                <GroupBox Grid.Row="3" Header="Log Output">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <TextBox Text="{Binding LogOutput}" 
-                                 IsReadOnly="True" 
-                                 TextWrapping="Wrap"
-                                 Background="Black"
-                                 Foreground="LightGreen"
-                                 FontFamily="Consolas"
-                                 FontSize="10"/>
-                    </ScrollViewer>
-                </GroupBox>
-            </Grid>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
         <!-- Status Bar -->
