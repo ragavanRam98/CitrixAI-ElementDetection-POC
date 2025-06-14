@@ -1,5 +1,7 @@
 ﻿using CitrixAI.Core.Interfaces;
 using CitrixAI.Core.Models;
+using CitrixAI.Core.Caching;
+using CitrixAI.Core.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,13 +11,14 @@ using System.Threading.Tasks;
 namespace CitrixAI.Detection.Orchestrator
 {
     /// <summary>
-    /// Orchestrates multiple detection strategies to provide optimal element detection.
+    /// Orchestrates multiple detection strategies with intelligent caching and memory monitoring.
     /// Implements the Strategy pattern and coordinates parallel detection execution.
     /// </summary>
     public sealed class DetectionOrchestrator : IDisposable
     {
         private readonly List<IDetectionStrategy> _strategies;
         private readonly IResultAggregator _resultAggregator;
+        private readonly IDetectionCache _detectionCache;
         private readonly object _strategiesLock = new object();
         private bool _disposed;
 
@@ -23,10 +26,12 @@ namespace CitrixAI.Detection.Orchestrator
         /// Initializes a new instance of the DetectionOrchestrator class.
         /// </summary>
         /// <param name="resultAggregator">The result aggregator for combining detection results.</param>
-        public DetectionOrchestrator(IResultAggregator resultAggregator = null)
+        /// <param name="cache">Optional cache for detection results.</param>
+        public DetectionOrchestrator(IResultAggregator resultAggregator = null, IDetectionCache cache = null)
         {
             _strategies = new List<IDetectionStrategy>();
             _resultAggregator = resultAggregator ?? new WeightedConsensusAggregator();
+            _detectionCache = cache;
         }
 
         /// <summary>
@@ -42,6 +47,11 @@ namespace CitrixAI.Detection.Orchestrator
                 }
             }
         }
+
+        /// <summary>
+        /// Gets cache statistics if cache is available.
+        /// </summary>
+        public int? CacheCount => _detectionCache?.Count;
 
         /// <summary>
         /// Registers a detection strategy with the orchestrator.
@@ -66,6 +76,8 @@ namespace CitrixAI.Detection.Orchestrator
                 _strategies.Add(strategy);
                 _strategies.Sort((s1, s2) => s2.Priority.CompareTo(s1.Priority));
             }
+
+            LogMessage($"Strategy registered: {strategy.Name} (Priority: {strategy.Priority})");
         }
 
         /// <summary>
@@ -80,15 +92,21 @@ namespace CitrixAI.Detection.Orchestrator
 
             lock (_strategiesLock)
             {
-                return _strategies.RemoveAll(s => s.StrategyId == strategyId) > 0;
+                var removedCount = _strategies.RemoveAll(s => s.StrategyId == strategyId);
+                if (removedCount > 0)
+                {
+                    LogMessage($"Strategy unregistered: {strategyId}");
+                    return true;
+                }
+                return false;
             }
         }
 
         /// <summary>
-        /// Performs element detection using the most appropriate strategies.
+        /// Performs element detection with intelligent caching and memory monitoring.
         /// </summary>
         /// <param name="context">The detection context containing image and search criteria.</param>
-        /// <returns>Aggregated detection result from multiple strategies.</returns>
+        /// <returns>Cached or newly computed detection result.</returns>
         /// <exception cref="ArgumentNullException">Thrown when context is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when no strategies are registered.</exception>
         public async Task<IDetectionResult> DetectElementsAsync(IDetectionContext context)
@@ -113,13 +131,76 @@ namespace CitrixAI.Detection.Orchestrator
                     TimeSpan.Zero);
             }
 
+            // Try cache lookup first
+            string imageHash = null;
+            if (_detectionCache != null)
+            {
+                try
+                {
+                    imageHash = DetectionCache.GetSimpleHash(context.SourceImage);
+                    if (_detectionCache.TryGet(imageHash, out var cachedResult))
+                    {
+                        LogCacheHit(imageHash);
+                        return cachedResult;
+                    }
+                    LogCacheMiss(imageHash);
+                }
+                catch (Exception ex)
+                {
+                    LogCacheError($"Cache lookup failed: {ex.Message}");
+                }
+            }
+
+            // Execute detection with memory tracking
+            IDetectionResult detectionResult;
+            long memoryUsed;
+
+            var memoryBefore = MemoryManager.GetCurrentMemoryUsage();
+            LogMemoryUsage($"Memory before detection: {memoryBefore} MB");
+
+            try
+            {
+                detectionResult = await ExecuteDetectionStrategies(applicableStrategies, context);
+            }
+            finally
+            {
+                var memoryAfter = MemoryManager.GetCurrentMemoryUsage();
+                memoryUsed = memoryAfter - memoryBefore;
+                LogMemoryUsage($"Memory after detection: {memoryAfter} MB (difference: {memoryUsed:+#;-#;0} MB)");
+            }
+
+            // Store successful results in cache
+            if (_detectionCache != null && imageHash != null && detectionResult.IsSuccessful)
+            {
+                try
+                {
+                    _detectionCache.Store(imageHash, detectionResult);
+                    LogCacheStore(imageHash, detectionResult.DetectedElements.Count);
+                }
+                catch (Exception ex)
+                {
+                    LogCacheError($"Cache storage failed: {ex.Message}");
+                }
+            }
+
+            return detectionResult;
+        }
+
+        /// <summary>
+        /// Executes detection strategies with existing orchestration logic.
+        /// </summary>
+        /// <param name="strategies">List of applicable strategies to execute.</param>
+        /// <param name="context">The detection context.</param>
+        /// <returns>Aggregated detection result.</returns>
+        private async Task<IDetectionResult> ExecuteDetectionStrategies(List<IDetectionStrategy> strategies, IDetectionContext context)
+        {
             var stopwatch = Stopwatch.StartNew();
             var detectionTasks = new List<Task<IDetectionResult>>();
 
             try
             {
                 // Execute strategies in parallel
-                foreach (var strategy in applicableStrategies)
+                foreach (var strategy in strategies)
                 {
                     detectionTasks.Add(ExecuteStrategyWithTimeout(strategy, context));
                 }
@@ -197,6 +278,15 @@ namespace CitrixAI.Detection.Orchestrator
         }
 
         /// <summary>
+        /// Clears the detection cache if available.
+        /// </summary>
+        public void ClearCache()
+        {
+            _detectionCache?.Clear();
+            LogMessage("Detection cache cleared");
+        }
+
+        /// <summary>
         /// Gets information about all registered strategies.
         /// </summary>
         /// <returns>Collection of strategy information.</returns>
@@ -236,6 +326,41 @@ namespace CitrixAI.Detection.Orchestrator
             }
         }
 
+        #region Cache and Memory Logging Methods
+
+        private void LogCacheHit(string imageHash)
+        {
+            LogMessage($"Cache HIT for hash {imageHash.Substring(0, 8)}... (Cache size: {_detectionCache.Count})");
+        }
+
+        private void LogCacheMiss(string imageHash)
+        {
+            LogMessage($"Cache MISS for hash {imageHash.Substring(0, 8)}... (Cache size: {_detectionCache.Count})");
+        }
+
+        private void LogCacheStore(string imageHash, int elementCount)
+        {
+            LogMessage($"Cache STORE for hash {imageHash.Substring(0, 8)}... with {elementCount} elements (Cache size: {_detectionCache.Count})");
+        }
+
+        private void LogCacheError(string error)
+        {
+            LogMessage($"Cache ERROR: {error}");
+        }
+
+        private void LogMemoryUsage(string message)
+        {
+            LogMessage($"MEMORY: {message}");
+        }
+
+        private void LogMessage(string message)
+        {
+            // This integrates with the ViewModel logging system
+            Debug.WriteLine($"[DetectionOrchestrator] {message}");
+        }
+
+        #endregion
+
         /// <summary>
         /// Releases resources used by the DetectionOrchestrator.
         /// </summary>
@@ -264,6 +389,7 @@ namespace CitrixAI.Detection.Orchestrator
                     disposableAggregator.Dispose();
                 }
 
+                _detectionCache?.Dispose();
                 _disposed = true;
             }
         }

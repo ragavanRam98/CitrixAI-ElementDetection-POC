@@ -84,27 +84,31 @@ namespace CitrixAI.Vision.OpenCV
 
                     // Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
                     using (var clahe = Cv2.CreateCLAHE(clipLimit: 2.0, tileGridSize: new OpenCvSharp.Size(8, 8)))
+                    using (var enhanced_gray = new Mat())
                     {
-                        using (var enhanced_gray = new Mat())
-                        {
-                            clahe.Apply(gray, enhanced_gray);
+                        clahe.Apply(gray, enhanced_gray);
 
-                            // Convert back to color
-                            Cv2.CvtColor(enhanced_gray, enhanced, ColorConversionCodes.GRAY2BGR);
-                        }
+                        // Convert back to color
+                        Cv2.CvtColor(enhanced_gray, enhanced, ColorConversionCodes.GRAY2BGR);
                     }
 
                     // Apply Gaussian blur to reduce noise
-                    Cv2.GaussianBlur(enhanced, enhanced, new OpenCvSharp.Size(3, 3), 0);
+                    using (var blurred = new Mat())
+                    {
+                        Cv2.GaussianBlur(enhanced, blurred, new OpenCvSharp.Size(3, 3), 0);
+                        blurred.CopyTo(enhanced);
+                    }
 
                     // Sharpen the image
                     using (var kernel = Mat.FromArray(new float[,] {
-                       { 0, -1, 0 },
-                       { -1, 5, -1 },
-                       { 0, -1, 0 }
-                   }))
+               { 0, -1, 0 },
+               { -1, 5, -1 },
+               { 0, -1, 0 }
+           }))
+                    using (var sharpened = new Mat())
                     {
-                        Cv2.Filter2D(enhanced, enhanced, -1, kernel);
+                        Cv2.Filter2D(enhanced, sharpened, -1, kernel);
+                        sharpened.CopyTo(enhanced);
                     }
                 }
 
@@ -112,7 +116,7 @@ namespace CitrixAI.Vision.OpenCV
             }
             catch (Exception ex)
             {
-                enhanced.Dispose();
+                enhanced?.Dispose();
                 throw new InvalidOperationException($"Failed to enhance image quality: {ex.Message}", ex);
             }
         }
@@ -143,7 +147,11 @@ namespace CitrixAI.Vision.OpenCV
                 }
 
                 // Apply median blur to reduce noise
-                Cv2.MedianBlur(processed, processed, 3);
+                using (var blurred = new Mat())
+                {
+                    Cv2.MedianBlur(processed, blurred, 3);
+                    blurred.CopyTo(processed);
+                }
 
                 // Apply adaptive threshold for better text contrast
                 using (var binary = new Mat())
@@ -153,11 +161,10 @@ namespace CitrixAI.Vision.OpenCV
 
                     // Morphological operations to clean up text
                     using (var kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(2, 2)))
+                    using (var morphed = new Mat())
                     {
-                        var temp = new Mat();
-                        Cv2.MorphologyEx(binary, temp, MorphTypes.Close, kernel);
-                        processed.Dispose();
-                        processed = temp;
+                        Cv2.MorphologyEx(binary, morphed, MorphTypes.Close, kernel);
+                        morphed.CopyTo(processed);
                     }
                 }
 

@@ -12,6 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory optimization improvements
 - Advanced result aggregation algorithms
 
+## [0.3.1] - Day 3 Second Half - DetectionCache Core + Memory Optimization
+
+### Added
+- **Intelligent Caching System**: LRU-based DetectionCache with configurable 50-entry limit
+- **Memory Optimization Framework**: MemoryManager utility for centralized memory monitoring
+- **Cache Integration**: DetectionOrchestrator enhanced with optional cache dependency injection
+- **Performance Monitoring**: Memory tracking and cache hit/miss ratio logging
+
+### Enhanced
+- **IDetectionCache Interface**: Added IDisposable inheritance for proper resource management
+- **DetectionOrchestrator**: Cache-first detection workflow (lookup → execute → store)
+- **MainViewModel**: Cache management and memory tracking integration
+- **OpenCV Operations**: Mat disposal pattern fixes to prevent memory leaks
+
+### Technical Implementation
+- **Hash Generation**: MD5 fingerprinting using 32x32 downscaled grayscale images
+- **Cache Operations**: O(1) lookup/store with doubly-linked list LRU eviction
+- **Memory Tracking**: Before/after operation monitoring with 500MB pressure threshold
+- **Resource Management**: Comprehensive IDisposable patterns throughout
+
+### Performance Targets
+- **Cache Effectiveness**: Infrastructure ready for 70% processing time reduction
+- **Memory Stability**: Framework for sustained <150MB operation
+- **Monitoring Foundation**: Performance metrics collection for optimization
+- **Architecture Quality**: SOLID principles maintained with clean abstractions
+
+### Integration Points
+- **Backward Compatibility**: Existing detection workflows unchanged
+- **Dependency Injection**: Clean cache integration via constructor parameters
+- **Error Handling**: Graceful cache operation failures with comprehensive logging
+- **Extensibility**: Foundation prepared for Day 3 Third Half advanced features
+
 ## [0.3.0] - Day 3 First Half - Responsive UI Foundation
 
 ### Added

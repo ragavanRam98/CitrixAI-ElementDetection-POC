@@ -3,6 +3,7 @@ using CitrixAI.Core.Models;
 using CitrixAI.Detection.Orchestrator;
 using CitrixAI.Detection.Strategies;
 using CitrixAI.Vision.Utilities;
+using CitrixAI.Core.Caching;
 using CitrixAI.Demo.Views;
 using Microsoft.Win32;
 using System;
