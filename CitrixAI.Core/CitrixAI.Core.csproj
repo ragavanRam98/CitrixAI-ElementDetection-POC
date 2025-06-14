@@ -75,8 +75,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Caching\AdvancedDetectionCache.cs" />
     <Compile Include="Caching\DetectionCache.cs" />
     <Compile Include="Class1.cs" />
+    <Compile Include="Classification\BasicElementClassifier .cs" />
     <Compile Include="Interfaces\ElementType.cs" />
     <Compile Include="Interfaces\IClassificationResult.cs" />
     <Compile Include="Interfaces\IDetectionCache.cs" />
@@ -104,6 +106,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utilities\HashCodeHelper.cs" />
     <Compile Include="Utilities\MemoryManager.cs" />
+    <Compile Include="Utilities\ResourceMonitor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

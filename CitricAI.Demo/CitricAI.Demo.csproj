@@ -61,6 +61,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Converters\WindowSizeConverter.cs" />
+    <Compile Include="ViewModels\PerformanceMonitorViewModel.cs" />
     <Compile Include="Views\AnnotationWindow.xaml.cs">
       <DependentUpon>AnnotationWindow.xaml</DependentUpon>
     </Compile>

@@ -74,6 +74,7 @@
   <ItemGroup>
     <Compile Include="Class1.cs" />
     <Compile Include="Orchestrator\DetectionOrchestrator.cs" />
+    <Compile Include="Orchestrator\ParallelDetectionOrchestrator.cs" />
     <Compile Include="Orchestrator\WeightedConsensusAggregator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Strategies\AIDetectionStrategy.cs" />

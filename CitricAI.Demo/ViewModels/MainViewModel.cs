@@ -4,6 +4,7 @@ using CitrixAI.Detection.Orchestrator;
 using CitrixAI.Detection.Strategies;
 using CitrixAI.Vision.Utilities;
 using CitrixAI.Core.Caching;
+using CitrixAI.Core.Classification;
 using CitrixAI.Demo.Views;
 using Microsoft.Win32;
 using System;
@@ -17,6 +18,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using CitrixAI.Core.Utilities;
+using System.Collections.Generic;
 
 namespace CitrixAI.Demo.ViewModels
 {
@@ -45,6 +48,10 @@ namespace CitrixAI.Demo.ViewModels
         private int _elementsFound;
         private double _imageQuality = 1.0;
         private DetectionResultViewModel _selectedResult;
+        private AdvancedDetectionCache _advancedCache;
+        private BasicElementClassifier _elementClassifier;
+        private ParallelDetectionOrchestrator _parallelOrchestrator;
+        private PerformanceMonitorViewModel _performanceMonitor;
 
         #endregion
 
@@ -159,6 +166,61 @@ namespace CitrixAI.Demo.ViewModels
             get => _selectedResult;
             set => SetProperty(ref _selectedResult, value);
         }
+        public double CacheHitRatio
+        {
+            get => _cacheHitRatio;
+            set => SetProperty(ref _cacheHitRatio, value);
+        }
+
+        public int CacheEntries
+        {
+            get => _cacheEntries;
+            set => SetProperty(ref _cacheEntries, value);
+        }
+
+        public double ClassificationAccuracy
+        {
+            get => _classificationAccuracy;
+            set => SetProperty(ref _classificationAccuracy, value);
+        }
+
+        private double _cacheHitRatio;
+        private int _cacheEntries;
+        private double _classificationAccuracy;
+
+        public string SystemResourceStatus
+        {
+            get
+            {
+                try
+                {
+                    var info = ResourceMonitor.GetSystemResourceInfo();
+                    return $"CPU: {info.CurrentCpuUsage:F1}% | Memory: {info.ProcessMemoryMB}MB | Cores: {info.CpuCores}";
+                }
+                catch
+                {
+                    return "Resource info unavailable";
+                }
+            }
+        }
+
+        public string PerformanceGrade
+        {
+            get
+            {
+                try
+                {
+                    if (_performanceMonitor != null)
+                        return _performanceMonitor.PerformanceGrade;
+                    return "N/A";
+                }
+                catch
+                {
+                    return "N/A";
+                }
+            }
+        }
+
 
         public ObservableCollection<DetectionResultViewModel> DetectionResults { get; private set; }
         public ObservableCollection<DetectedElementViewModel> DetectedElements { get; private set; }
@@ -271,7 +333,7 @@ namespace CitrixAI.Demo.ViewModels
             try
             {
                 IsProcessing = true;
-                StatusMessage = "Running element detection...";
+                StatusMessage = "Running advanced element detection...";
 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -284,26 +346,181 @@ namespace CitrixAI.Demo.ViewModels
                     new[] { ElementType.Button, ElementType.TextBox, ElementType.Label, ElementType.Dropdown },
                     ConfidenceThreshold);
 
-                // Run detection
-                var result = await _detectionOrchestrator.DetectElementsAsync(context);
+                // Choose orchestrator based on image size and complexity
+                var useParallelProcessing = ShouldUseParallelProcessing(bitmap);
+                IDetectionResult result;
+
+                if (useParallelProcessing && _parallelOrchestrator != null)
+                {
+                    LogMessage("Using parallel detection orchestrator");
+                    result = await _parallelOrchestrator.DetectElementsAsync(context);
+                }
+                else
+                {
+                    LogMessage("Using standard detection orchestrator");
+                    result = await _detectionOrchestrator.DetectElementsAsync(context);
+                }
 
                 stopwatch.Stop();
                 DetectionTime = stopwatch.Elapsed.TotalMilliseconds;
 
-                // Process results
-                ProcessDetectionResult(result);
+                // Enhance results with classification if available
+                var enhancedResult = await EnhanceWithClassification(result, context);
 
-                LogMessage($"Detection completed in {DetectionTime:F0}ms. Found {result.DetectedElements.Count} elements.");
-                StatusMessage = $"Detection completed - {result.DetectedElements.Count} elements found";
+                // Process results
+                ProcessDetectionResult(enhancedResult);
+
+                // Update cache statistics
+                UpdateCacheStatistics();
+
+                LogMessage($"Advanced detection completed in {DetectionTime:F0}ms");
+                LogMessage($"Found {enhancedResult.DetectedElements.Count} elements with {enhancedResult.OverallConfidence:F2} confidence");
+
+                if (_advancedCache != null)
+                {
+                    LogMessage($"Cache hit ratio: {CacheHitRatio:P1}, Classification accuracy: {ClassificationAccuracy:P1}");
+                }
+
+                StatusMessage = $"Detection completed - {enhancedResult.DetectedElements.Count} elements found";
             }
             catch (Exception ex)
             {
-                LogError($"Detection failed: {ex.Message}");
+                LogError($"Advanced detection failed: {ex.Message}");
                 StatusMessage = "Detection failed";
             }
             finally
             {
                 IsProcessing = false;
+            }
+        }
+
+        private bool ShouldUseParallelProcessing(Bitmap image)
+        {
+            if (_parallelOrchestrator == null) return false;
+
+            var imageArea = image.Width * image.Height;
+            var availableStrategies = _parallelOrchestrator.GetRegisteredStrategies().Count;
+
+            // Use parallel processing for larger images or when multiple strategies are available
+            return availableStrategies >= 2 &&
+                   (imageArea > 500000 || availableStrategies >= 3) &&
+                   !ResourceMonitor.IsSystemUnderLoad();
+        }
+
+        private async Task<IDetectionResult> EnhanceWithClassification(IDetectionResult result, IDetectionContext context)
+        {
+            if (!result.IsSuccessful || result.DetectedElements.Count == 0 || _elementClassifier == null)
+                return result;
+
+            try
+            {
+                var classifiedElements = new List<IElementInfo>();
+                var classificationSuccessCount = 0;
+
+                foreach (var element in result.DetectedElements)
+                {
+                    try
+                    {
+                        var classificationResult = await _elementClassifier.ClassifyAsync(element, context);
+
+                        if (classificationResult.IsSuccessful && classificationResult.Confidence >= 0.6)
+                        {
+                            // Create enhanced element with classification
+                            var enhancedElement = new ElementInfo(
+                                element.BoundingBox,
+                                classificationResult.ClassifiedType,
+                                element.Confidence,
+                                element.Text,
+                                CombineProperties(element.Properties, classificationResult.Properties),
+                                element.Features,
+                                classificationResult.Confidence,
+                                element.Parent,
+                                element.Children);
+
+                            classifiedElements.Add(enhancedElement);
+                            classificationSuccessCount++;
+                        }
+                        else
+                        {
+                            classifiedElements.Add(element); // Keep original if classification failed
+                        }
+                    }
+                    catch
+                    {
+                        classifiedElements.Add(element); // Keep original on error
+                    }
+                }
+
+                // Update classification accuracy
+                ClassificationAccuracy = result.DetectedElements.Count > 0 ?
+                    (double)classificationSuccessCount / result.DetectedElements.Count : 0.0;
+
+                // Create enhanced result
+                var enhancedMetadata = new Dictionary<string, object>(result.Metadata)
+                {
+                    ["ClassificationEnabled"] = true,
+                    ["ClassificationAccuracy"] = ClassificationAccuracy,
+                    ["ClassifiedElements"] = classificationSuccessCount
+                };
+
+                return new DetectionResult(
+                    result.StrategyId + "_Enhanced",
+                    classifiedElements,
+                    result.OverallConfidence,
+                    result.ProcessingTime,
+                    enhancedMetadata,
+                    result.Warnings,
+                    result.ImageQuality);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Classification enhancement failed: {ex.Message}");
+                return result; // Return original result if enhancement fails
+            }
+        }
+
+        public async Task UpdateAdvancedMetricsAsync()
+        {
+            try
+            {
+                UpdateCacheStatistics();
+                OnPropertyChanged(nameof(SystemResourceStatus));
+                OnPropertyChanged(nameof(PerformanceGrade));
+
+                if (_performanceMonitor != null)
+                    await _performanceMonitor.UpdateMetricsAsync();
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Failed to update advanced metrics: {ex.Message}");
+            }
+        }
+
+        private Dictionary<string, object> CombineProperties(IDictionary<string, object> original,
+    IDictionary<string, object> classification)
+        {
+            var combined = new Dictionary<string, object>(original);
+            foreach (var prop in classification)
+            {
+                combined[$"Classification_{prop.Key}"] = prop.Value;
+            }
+            return combined;
+        }
+
+        private void UpdateCacheStatistics()
+        {
+            try
+            {
+                if (_advancedCache != null)
+                {
+                    var stats = _advancedCache.GetStatistics();
+                    CacheHitRatio = stats.HitRatio;
+                    CacheEntries = stats.TotalEntries;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Failed to update cache statistics: {ex.Message}");
             }
         }
 
@@ -422,7 +639,21 @@ namespace CitrixAI.Demo.ViewModels
 
         private void OpenPerformanceMonitor()
         {
-            LogMessage("Performance monitor will be implemented in future iterations");
+            try
+            {
+                LogMessage("Performance monitor will be implemented in the next iteration");
+                // TODO: Implement PerformanceMonitorWindow
+                // var performanceWindow = new PerformanceMonitorWindow
+                // {
+                //     DataContext = _performanceMonitor
+                // };
+                // performanceWindow.Show();
+                // LogMessage("Performance monitor opened");
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to open performance monitor: {ex.Message}");
+            }
         }
 
         private void ShowAbout()
@@ -471,64 +702,84 @@ namespace CitrixAI.Demo.ViewModels
 
         private void InitializeDetectionSystem()
         {
-            LogMessage("Starting detection system initialization...");
+            LogMessage("Starting advanced detection system initialization...");
             try
             {
-                _detectionOrchestrator = new DetectionOrchestrator();
+                // Initialize advanced cache
+                _advancedCache = new AdvancedDetectionCache(maxEntries: 100, similarityThreshold: 0.85);
+                LogMessage("Advanced detection cache initialized with perceptual hashing");
+
+                // Initialize element classifier
+                _elementClassifier = new BasicElementClassifier(confidenceThreshold: 0.6);
+                LogMessage("Basic element classifier initialized");
+
+                // Initialize parallel orchestrator with advanced cache
+                _parallelOrchestrator = new ParallelDetectionOrchestrator(
+                    resultAggregator: new WeightedConsensusAggregator(),
+                    cache: _advancedCache,
+                    maxParallelism: 0 // Auto-detect optimal parallelism
+                );
+
+                // Also keep the basic orchestrator for comparison
+                _detectionOrchestrator = new DetectionOrchestrator(cache: _advancedCache);
                 _screenshotCapture = new ScreenshotCapture();
 
-                LogMessage("Attempting to register AI Detection Strategy...");
-                // Register AI Detection Strategy
-                try
-                {
-                    var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "ui_detection.onnx");
-                    var aiStrategy = new AIDetectionStrategy(modelPath, 0.5, 0.4);
-                    _detectionOrchestrator.RegisterStrategy(aiStrategy);
-                    LogMessage("AI Detection Strategy registered successfully");
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Failed to register AI strategy: {ex.Message}");
-                }
+                // Initialize performance monitoring
+                _performanceMonitor = new PerformanceMonitorViewModel(_advancedCache);
 
-                LogMessage("Attempting to register Template Matching Strategy...");
-                // Register existing Template Matching Strategy
-                try
-                {
-                    var templateStrategy = new TemplateMatchingStrategy();
-                    _detectionOrchestrator.RegisterStrategy(templateStrategy);
-                    LogMessage("Template Matching Strategy registered successfully");
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Failed to register template strategy: {ex.Message}");
-                }
+                // Register strategies with both orchestrators
+                RegisterDetectionStrategies();
 
-                // Validate registration
-                var registeredStrategies = _detectionOrchestrator.GetRegisteredStrategies();
-                LogMessage($"Detection system initialized with {registeredStrategies.Count} strategies");
-
-                foreach (var strategy in registeredStrategies.OrderByDescending(s => s.Priority))
-                {
-                    LogMessage($"  Strategy: {strategy.Name} (Priority: {strategy.Priority})");
-                }
+                LogMessage($"Advanced detection system initialized with {_parallelOrchestrator.MaxParallelism} max parallelism");
+                LogMessage("Resource utilization monitoring enabled");
             }
             catch (Exception ex)
             {
-                LogError($"Failed to initialize detection system: {ex.Message}");
+                LogError($"Failed to initialize advanced detection system: {ex.Message}");
+                // Fallback to basic system
+                InitializeBasicDetectionSystemFallback();
+            }
+        }
 
-                // Fallback to basic template matching
-                try
-                {
-                    _detectionOrchestrator = new DetectionOrchestrator();
-                    var fallbackStrategy = new TemplateMatchingStrategy();
-                    _detectionOrchestrator.RegisterStrategy(fallbackStrategy);
-                    LogMessage("Fallback: Initialized with template matching only");
-                }
-                catch (Exception fallbackEx)
-                {
-                    LogError($"Fallback initialization failed: {fallbackEx.Message}");
-                }
+        private void RegisterDetectionStrategies()
+        {
+            LogMessage("Registering detection strategies...");
+            try
+            {
+                // Register AI Detection Strategy
+                var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Models", "ui_detection.onnx");
+                var aiStrategy = new AIDetectionStrategy(modelPath, 0.5, 0.4);
+
+                _detectionOrchestrator.RegisterStrategy(aiStrategy);
+                _parallelOrchestrator.RegisterStrategy(aiStrategy);
+                LogMessage("AI Detection Strategy registered");
+
+                // Register Template Matching Strategy
+                var templateStrategy = new TemplateMatchingStrategy();
+                _detectionOrchestrator.RegisterStrategy(templateStrategy);
+                _parallelOrchestrator.RegisterStrategy(templateStrategy);
+                LogMessage("Template Matching Strategy registered");
+
+                LogMessage($"Total strategies registered: {_detectionOrchestrator.StrategyCount}");
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to register strategies: {ex.Message}");
+            }
+        }
+
+        private void InitializeBasicDetectionSystemFallback()
+        {
+            try
+            {
+                _detectionOrchestrator = new DetectionOrchestrator();
+                var fallbackStrategy = new TemplateMatchingStrategy();
+                _detectionOrchestrator.RegisterStrategy(fallbackStrategy);
+                LogMessage("Fallback: Initialized with template matching only");
+            }
+            catch (Exception fallbackEx)
+            {
+                LogError($"Fallback initialization failed: {fallbackEx.Message}");
             }
         }
 
@@ -631,7 +882,8 @@ namespace CitrixAI.Demo.ViewModels
         private void LogMessage(string message)
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            LogOutput += $"[{timestamp}] {message}\n";
+            var memoryUsage = MemoryManager.GetCurrentMemoryUsage();
+            LogOutput += $"[{timestamp}] {message} (Mem: {memoryUsage}MB)\n";
             OnPropertyChanged(nameof(LogOutput));
         }
 
@@ -670,7 +922,10 @@ namespace CitrixAI.Demo.ViewModels
         public void Dispose()
         {
             _detectionOrchestrator?.Dispose();
+            _parallelOrchestrator?.Dispose();
             _screenshotCapture?.Dispose();
+            _advancedCache?.Dispose();
+            _performanceMonitor?.Dispose();
         }
 
         #endregion
