@@ -4,16 +4,12 @@
              StartupUri="Views/MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
-            <!-- Add styles here as needed -->
-            <Style TargetType="Button">
-                <Setter Property="Margin" Value="5"/>
-                <Setter Property="Padding" Value="10,5"/>
-            </Style>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Include centralized responsive styles -->
+                <ResourceDictionary Source="Styles/ApplicationStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-            <Style TargetType="TextBlock">
-                <Setter Property="VerticalAlignment" Value="Center"/>
-            </Style>
-
+            <!-- Application-wide converters -->
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>

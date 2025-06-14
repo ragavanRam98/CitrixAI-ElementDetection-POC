@@ -60,6 +60,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Converters\WindowSizeConverter.cs" />
     <Compile Include="Views\AnnotationWindow.xaml.cs">
       <DependentUpon>AnnotationWindow.xaml</DependentUpon>
     </Compile>
@@ -133,6 +134,9 @@
       <Project>{e7278a9d-3988-4eb7-8557-eb1cce9efdfa}</Project>
       <Name>CitrixAI.Vision</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Utilities\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
