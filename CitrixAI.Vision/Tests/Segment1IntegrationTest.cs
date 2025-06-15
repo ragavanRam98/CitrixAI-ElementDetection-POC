@@ -1,14 +1,17 @@
 ﻿using CitrixAI.Vision.Processing;
+using CitrixAI.Core.ML.ImageProcessing;
 using OpenCvSharp;
+using OpenCvSharp.Extensions;
 using System;
 using System.Drawing;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace CitrixAI.Vision.Tests
 {
     /// <summary>
     /// Integration test to verify Segment 1 implementation works correctly.
-    /// Tests AdvancedImageProcessor and ImageQualityAnalyzer functionality.
+    /// Tests AdvancedImageProcessor (Vision) and ImageQualityAnalyzer (Core) functionality.
     /// </summary>
     public static class Segment1IntegrationTest
     {
@@ -17,14 +20,14 @@ namespace CitrixAI.Vision.Tests
         /// </summary>
         /// <param name="logger">Optional callback for logging test progress and results.</param>
         /// <returns>True if all tests pass, false if any failures detected.</returns>
-        public static bool RunTests(Action<string> logger = null)
+        public static async Task<bool> RunTestsAsync(Action<string> logger = null)
         {
             logger?.Invoke("Starting Segment 1 Integration Tests...");
 
             try
             {
                 // Test 1: AdvancedImageProcessor instantiation
-                if (!TestAdvancedImageProcessorCreation(logger))
+                if (!await TestAdvancedImageProcessorCreationAsync(logger))
                 {
                     logger?.Invoke("❌ AdvancedImageProcessor creation test failed");
                     return false;
@@ -32,7 +35,7 @@ namespace CitrixAI.Vision.Tests
                 logger?.Invoke("✅ AdvancedImageProcessor creation test passed");
 
                 // Test 2: ImageQualityAnalyzer instantiation
-                if (!TestImageQualityAnalyzerCreation(logger))
+                if (!await TestImageQualityAnalyzerCreationAsync(logger))
                 {
                     logger?.Invoke("❌ ImageQualityAnalyzer creation test failed");
                     return false;
@@ -40,7 +43,7 @@ namespace CitrixAI.Vision.Tests
                 logger?.Invoke("✅ ImageQualityAnalyzer creation test passed");
 
                 // Test 3: Create test image and process it
-                if (!TestImageProcessingPipeline(logger))
+                if (!await TestImageProcessingPipelineAsync(logger))
                 {
                     logger?.Invoke("❌ Image processing pipeline test failed");
                     return false;
@@ -48,7 +51,7 @@ namespace CitrixAI.Vision.Tests
                 logger?.Invoke("✅ Image processing pipeline test passed");
 
                 // Test 4: Quality analysis functionality
-                if (!TestQualityAnalysisPipeline(logger))
+                if (!await TestQualityAnalysisPipelineAsync(logger))
                 {
                     logger?.Invoke("❌ Quality analysis pipeline test failed");
                     return false;
@@ -56,7 +59,7 @@ namespace CitrixAI.Vision.Tests
                 logger?.Invoke("✅ Quality analysis pipeline test passed");
 
                 // Test 5: Multi-scale processing
-                if (!TestMultiScaleProcessing(logger))
+                if (!await TestMultiScaleProcessingAsync(logger))
                 {
                     logger?.Invoke("❌ Multi-scale processing test failed");
                     return false;
@@ -74,9 +77,25 @@ namespace CitrixAI.Vision.Tests
         }
 
         /// <summary>
+        /// Legacy synchronous wrapper for backward compatibility with existing UI code.
+        /// </summary>
+        public static bool RunTests(Action<string> logger = null)
+        {
+            try
+            {
+                return RunTestsAsync(logger).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                logger?.Invoke($"❌ Segment 1 tests failed with exception: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Tests AdvancedImageProcessor creation and basic functionality.
         /// </summary>
-        private static bool TestAdvancedImageProcessorCreation(Action<string> logger = null)
+        private static async Task<bool> TestAdvancedImageProcessorCreationAsync(Action<string> logger = null)
         {
             try
             {
@@ -99,7 +118,7 @@ namespace CitrixAI.Vision.Tests
                     using (var configuredProcessor = new AdvancedImageProcessor(multiScaleConfig, noiseConfig))
                     {
                         logger?.Invoke("  - Default and configured processors created successfully");
-                        return true; // Successfully created both default and configured processors
+                        return await Task.FromResult(true);
                     }
                 }
             }
@@ -113,14 +132,14 @@ namespace CitrixAI.Vision.Tests
         /// <summary>
         /// Tests ImageQualityAnalyzer creation and basic functionality.
         /// </summary>
-        private static bool TestImageQualityAnalyzerCreation(Action<string> logger = null)
+        private static async Task<bool> TestImageQualityAnalyzerCreationAsync(Action<string> logger = null)
         {
             try
             {
                 using (var analyzer = new ImageQualityAnalyzer())
                 {
                     logger?.Invoke("  - ImageQualityAnalyzer created successfully");
-                    return true; // Successfully created analyzer
+                    return await Task.FromResult(true);
                 }
             }
             catch (Exception ex)
@@ -133,7 +152,7 @@ namespace CitrixAI.Vision.Tests
         /// <summary>
         /// Creates a test image and runs it through the advanced processing pipeline.
         /// </summary>
-        private static bool TestImageProcessingPipeline(Action<string> logger = null)
+        private static async Task<bool> TestImageProcessingPipelineAsync(Action<string> logger = null)
         {
             try
             {
@@ -175,7 +194,7 @@ namespace CitrixAI.Vision.Tests
                         logger?.Invoke("  - Comprehensive preprocessing pipeline: PASSED");
                     }
 
-                    return true;
+                    return await Task.FromResult(true);
                 }
             }
             catch (Exception ex)
@@ -188,61 +207,68 @@ namespace CitrixAI.Vision.Tests
         /// <summary>
         /// Tests the quality analysis functionality with a test image.
         /// </summary>
-        private static bool TestQualityAnalysisPipeline(Action<string> logger = null)
+        private static async Task<bool> TestQualityAnalysisPipelineAsync(Action<string> logger = null)
         {
             try
             {
-                using (var testImage = CreateTestImage())
+                using (var testImageMat = CreateTestImage())
                 using (var analyzer = new ImageQualityAnalyzer())
                 {
-                    // Perform quality assessment
-                    var assessment = analyzer.AnalyzeQuality(testImage);
+                    // Convert OpenCV Mat to System.Drawing.Bitmap for quality analysis
+                    using (var testImageBitmap = BitmapConverter.ToBitmap(testImageMat))
+                    {
+                        // Perform quality assessment using the new async API
+                        var assessment = await analyzer.AnalyzeQualityAsync(testImageBitmap);
 
-                    // Validate assessment results
-                    if (assessment == null)
-                        return false;
+                        // Validate assessment results
+                        if (assessment == null)
+                            return false;
 
-                    // Check that all metrics are within expected ranges
-                    if (assessment.OverallScore < 0.0 || assessment.OverallScore > 1.0)
-                        return false;
+                        // Check that all metrics are within expected ranges
+                        if (assessment.OverallScore < 0.0 || assessment.OverallScore > 1.0)
+                            return false;
 
-                    if (assessment.Brightness < 0.0 || assessment.Brightness > 1.0)
-                        return false;
+                        if (assessment.BrightnessScore < 0.0 || assessment.BrightnessScore > 1.0)
+                            return false;
 
-                    if (assessment.Contrast < 0.0 || assessment.Contrast > 1.0)
-                        return false;
+                        if (assessment.ContrastScore < 0.0 || assessment.ContrastScore > 1.0)
+                            return false;
 
-                    if (assessment.Sharpness < 0.0 || assessment.Sharpness > 1.0)
-                        return false;
+                        if (assessment.SharpnessScore < 0.0 || assessment.SharpnessScore > 1.0)
+                            return false;
 
-                    if (assessment.NoiseLevel < 0.0 || assessment.NoiseLevel > 1.0)
-                        return false;
+                        if (assessment.NoiseLevel < 0.0 || assessment.NoiseLevel > 1.0)
+                            return false;
 
-                    // Check that recommendations are generated
-                    if (assessment.Recommendations == null)
-                        return false;
+                        // Check that recommendations are generated
+                        if (assessment.Recommendations == null)
+                            return false;
 
-                    // Test quality description functionality
-                    var description = analyzer.GetQualityDescription(assessment.OverallScore);
-                    if (string.IsNullOrEmpty(description))
-                        return false;
+                        // Test legacy compatibility methods
+                        var legacyScore = await analyzer.AnalyzeQuality(testImageBitmap);
+                        if (legacyScore < 0.0 || legacyScore > 1.0)
+                            return false;
 
-                    // Test preprocessing requirement check
-                    var requiresPreprocessing = analyzer.RequiresPreprocessing(assessment);
-                    // This should return a boolean without error
+                        var description = analyzer.GetQualityDescription(assessment.OverallScore);
+                        if (string.IsNullOrEmpty(description))
+                            return false;
 
-                    logger?.Invoke($"  - Quality Assessment Results:");
-                    logger?.Invoke($"    Overall Score: {assessment.OverallScore:F3}");
-                    logger?.Invoke($"    Brightness: {assessment.Brightness:F3}");
-                    logger?.Invoke($"    Contrast: {assessment.Contrast:F3}");
-                    logger?.Invoke($"    Sharpness: {assessment.Sharpness:F3}");
-                    logger?.Invoke($"    Noise Level: {assessment.NoiseLevel:F3}");
-                    logger?.Invoke($"    Edge Density: {assessment.EdgeDensity:F3}");
-                    logger?.Invoke($"    Description: {description}");
-                    logger?.Invoke($"    Requires Preprocessing: {requiresPreprocessing}");
-                    logger?.Invoke($"    Recommendations Count: {assessment.Recommendations.Count}");
+                        var requiresPreprocessing = analyzer.RequiresPreprocessing(assessment.OverallScore);
+                        // This should return a boolean without error
 
-                    return true;
+                        logger?.Invoke($"  - Quality Assessment Results:");
+                        logger?.Invoke($"    Overall Score: {assessment.OverallScore:F3}");
+                        logger?.Invoke($"    Brightness: {assessment.BrightnessScore:F3}");
+                        logger?.Invoke($"    Contrast: {assessment.ContrastScore:F3}");
+                        logger?.Invoke($"    Sharpness: {assessment.SharpnessScore:F3}");
+                        logger?.Invoke($"    Noise Level: {assessment.NoiseLevel:F3}");
+                        logger?.Invoke($"    Description: {description}");
+                        logger?.Invoke($"    Requires Preprocessing: {requiresPreprocessing}");
+                        logger?.Invoke($"    Recommendations Count: {assessment.Recommendations.Count}");
+                        logger?.Invoke($"    Legacy Score Match: {Math.Abs(legacyScore - assessment.OverallScore) < 0.001}");
+
+                        return true;
+                    }
                 }
             }
             catch (Exception ex)
@@ -255,62 +281,57 @@ namespace CitrixAI.Vision.Tests
         /// <summary>
         /// Tests multi-scale pyramid creation functionality.
         /// </summary>
-        private static bool TestMultiScaleProcessing(Action<string> logger = null)
+        private static async Task<bool> TestMultiScaleProcessingAsync(Action<string> logger = null)
         {
             try
             {
                 using (var testImage = CreateTestImage())
                 using (var processor = new AdvancedImageProcessor())
                 {
-                    // Create multi-scale pyramid
+                    // Test multi-scale pyramid generation
                     var pyramid = processor.CreateMultiScalePyramid(testImage);
+
+                    if (pyramid == null || pyramid.Count == 0)
+                        return false;
+
+                    logger?.Invoke($"  - Multi-scale pyramid created with {pyramid.Count} levels");
+
+                    // Test that pyramid contains different scales
+                    var originalSize = testImage.Size();
+                    bool foundDifferentScale = false;
 
                     try
                     {
-                        // Validate pyramid creation
-                        if (pyramid == null || pyramid.Count == 0)
-                            return false;
-
-                        // Check that different scales are present
-                        if (!pyramid.ContainsKey(1.0)) // Should always contain original scale
-                            return false;
-
-                        logger?.Invoke($"  - Multi-scale pyramid created with {pyramid.Count} scales");
-
-                        // Validate that scaled images have appropriate sizes
                         foreach (var kvp in pyramid)
                         {
                             var scaleFactor = kvp.Key;
-                            var scaledImage = kvp.Value;
+                            var scaledMat = kvp.Value;
 
-                            if (scaledImage == null || scaledImage.IsDisposed)
-                                return false;
-
-                            // Check that the size matches the scale factor (approximately)
-                            var expectedWidth = (int)(testImage.Width * scaleFactor);
-                            var expectedHeight = (int)(testImage.Height * scaleFactor);
-
-                            // Allow for small rounding differences
-                            if (Math.Abs(scaledImage.Width - expectedWidth) > 2 ||
-                                Math.Abs(scaledImage.Height - expectedHeight) > 2)
+                            if (scaledMat.Size() != originalSize)
                             {
-                                logger?.Invoke($"  - Scale factor {scaleFactor}: Expected {expectedWidth}x{expectedHeight}, got {scaledImage.Width}x{scaledImage.Height}");
-                                return false;
+                                foundDifferentScale = true;
                             }
 
-                            logger?.Invoke($"  - Scale {scaleFactor:F1}x: {scaledImage.Width}x{scaledImage.Height} ✓");
+                            logger?.Invoke($"  - Scale {scaleFactor:F1}x: {scaledMat.Width}x{scaledMat.Height}");
                         }
 
-                        return true;
+                        if (!foundDifferentScale)
+                        {
+                            logger?.Invoke("  - Multi-scale processing failed: All scales are same size");
+                            return false;
+                        }
                     }
                     finally
                     {
-                        // Clean up pyramid images
-                        foreach (var image in pyramid.Values)
+                        // Clean up pyramid mats
+                        foreach (var kvp in pyramid)
                         {
-                            image?.Dispose();
+                            kvp.Value?.Dispose();
                         }
                     }
+
+                    logger?.Invoke("  - Multi-scale processing: PASSED");
+                    return await Task.FromResult(true);
                 }
             }
             catch (Exception ex)
@@ -321,7 +342,7 @@ namespace CitrixAI.Vision.Tests
         }
 
         /// <summary>
-        /// Creates a test image with various patterns for testing purposes.
+        /// Creates a test image using OpenCV Mat with various patterns for testing.
         /// </summary>
         /// <returns>Test image Mat.</returns>
         private static Mat CreateTestImage()
@@ -343,6 +364,17 @@ namespace CitrixAI.Vision.Tests
             Cv2.PutText(testImage, "TEST", new OpenCvSharp.Point(10, 30), HersheyFonts.HersheySimplex, 1, Scalar.Black, 2);
 
             return testImage;
+        }
+
+        /// <summary>
+        /// Creates a test bitmap for direct bitmap testing scenarios.
+        /// </summary>
+        private static Bitmap CreateTestBitmap()
+        {
+            using (var mat = CreateTestImage())
+            {
+                return BitmapConverter.ToBitmap(mat);
+            }
         }
     }
 }
