@@ -36,6 +36,8 @@
                 <MenuItem Header="_Mock Citrix Generator" Command="{Binding OpenMockGeneratorCommand}"/>
                 <MenuItem Header="_Annotation Tool" Command="{Binding OpenAnnotationToolCommand}"/>
                 <MenuItem Header="_Performance Monitor" Command="{Binding OpenPerformanceMonitorCommand}"/>
+                <Separator/>
+                <MenuItem Header="_Run Segment 1 Tests" Command="{Binding RunSegment1TestCommand}"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Command="{Binding AboutCommand}"/>

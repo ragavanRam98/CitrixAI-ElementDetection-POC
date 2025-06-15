@@ -242,6 +242,8 @@ namespace CitrixAI.Demo.ViewModels
         public ICommand AboutCommand { get; private set; }
         public ICommand ExitCommand { get; private set; }
 
+        public ICommand RunSegment1TestCommand { get; private set; }
+
         #endregion
 
         #region Command Implementations
@@ -260,8 +262,53 @@ namespace CitrixAI.Demo.ViewModels
             OpenPerformanceMonitorCommand = new RelayCommand(OpenPerformanceMonitor);
             AboutCommand = new RelayCommand(ShowAbout);
             ExitCommand = new RelayCommand(() => Application.Current.Shutdown());
+            RunSegment1TestCommand = new RelayCommand(async () => await RunSegment1TestAsync());
         }
 
+        private async Task RunSegment1TestAsync()
+        {
+            try
+            {
+                IsProcessing = true;
+                StatusMessage = "Running Segment 1 Integration Tests...";
+                LogMessage("=== SEGMENT 1 INTEGRATION TEST START ===");
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        var success = CitrixAI.Vision.Tests.Segment1IntegrationTest.RunTests(
+                            message => Application.Current.Dispatcher.Invoke(() => LogMessage(message))
+                        );
+
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            LogMessage($"=== SEGMENT 1 TEST RESULT: {(success ? "PASSED" : "FAILED")} ===");
+                            StatusMessage = success ?
+                                "Segment 1 tests completed successfully" :
+                                "Segment 1 tests failed - check log for details";
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            LogError($"Segment 1 test execution failed: {ex.Message}");
+                            StatusMessage = "Segment 1 test execution failed";
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                LogError($"Failed to start Segment 1 tests: {ex.Message}");
+                StatusMessage = "Failed to start tests";
+            }
+            finally
+            {
+                IsProcessing = false;
+            }
+        }
         private async Task OpenImageAsync()
         {
             try
