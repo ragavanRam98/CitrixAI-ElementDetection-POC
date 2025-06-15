@@ -107,6 +107,7 @@
     <Compile Include="Interfaces\IResultAggregator.cs" />
     <Compile Include="Interfaces\ITextFeatures.cs" />
     <Compile Include="ML\ImageProcessing\ImageQualityAnalyzer.cs" />
+    <Compile Include="ML\Interface\IModelEvaluator.cs" />
     <Compile Include="ML\Interface\ITrainingDataSource.cs" />
     <Compile Include="ML\ModelManager.cs" />
     <Compile Include="ML\Models\AnnotationData.cs" />
@@ -121,6 +122,8 @@
     <Compile Include="ML\Models\QualityRange.cs" />
     <Compile Include="ML\Models\SampleMetadata.cs" />
     <Compile Include="ML\Models\TrainingSample.cs" />
+    <Compile Include="ML\Training\DataAugmentation.cs" />
+    <Compile Include="ML\Training\ModelEvaluator.cs" />
     <Compile Include="ML\Training\TrainingDataManager.cs" />
     <Compile Include="Models\ConfidenceScore.cs" />
     <Compile Include="Models\DetectionContext.cs" />
