@@ -74,6 +74,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="OpenCV\RobustTemplateMatchingEngine.cs" />
     <Compile Include="OpenCV\TemplateMatchingEngine.cs" />
     <Compile Include="Processing\AdvancedImageProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

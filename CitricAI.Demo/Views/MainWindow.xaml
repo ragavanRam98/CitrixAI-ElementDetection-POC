@@ -32,6 +32,14 @@
                 <Separator/>
                 <MenuItem Header="_Clear Results" Command="{Binding ClearResultsCommand}"/>
             </MenuItem>
+            <MenuItem Header="_Advanced Detection">
+                <MenuItem Header="Test Enhanced Detection" Command="{Binding TestSegment3Command}" />
+                <MenuItem Header="Run Enhanced Detection" Command="{Binding RunEnhancedDetectionCommand}" />
+                <Separator />
+                <MenuItem Header="Context Analysis Demo" Command="{Binding DemoContextAnalysisCommand}" />
+                <MenuItem Header="Pattern Recognition Demo" Command="{Binding DemoPatternRecognitionCommand}" />
+                <MenuItem Header="Robust Template Matching Demo" Command="{Binding DemoRobustTemplateMatchingCommand}" />
+            </MenuItem>
             <MenuItem Header="_Tools">
                 <MenuItem Header="_Mock Citrix Generator" Command="{Binding OpenMockGeneratorCommand}"/>
                 <MenuItem Header="_Annotation Tool" Command="{Binding OpenAnnotationToolCommand}"/>

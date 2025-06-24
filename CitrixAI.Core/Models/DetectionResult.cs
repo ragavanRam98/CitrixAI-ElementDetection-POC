@@ -86,6 +86,34 @@ namespace CitrixAI.Core.Models
         public double ImageQuality { get; }
 
         /// <summary>
+        /// Creates a successful detection result.
+        /// </summary>
+        /// <param name="strategyId">The strategy that produced this result.</param>
+        /// <param name="detectedElements">The collection of detected elements.</param>
+        /// <param name="processingTime">The processing time taken.</param>
+        /// <param name="metadata">Additional metadata.</param>
+        /// <returns>A successful detection result.</returns>
+        public static DetectionResult CreateSuccessful(
+            string strategyId,
+            IEnumerable<IElementInfo> detectedElements,
+            TimeSpan processingTime,
+            IDictionary<string, object> metadata = null)
+        {
+            var elementsList = detectedElements.ToList();
+            var overallConfidence = elementsList.Any()
+                ? elementsList.Average(e => e.Confidence)
+                : 0.0;
+
+            return new DetectionResult(
+                strategyId,
+                elementsList,
+                overallConfidence,
+                processingTime,
+                metadata,
+                imageQuality: 1.0);
+        }
+
+        /// <summary>
         /// Creates a failed detection result.
         /// </summary>
         /// <param name="strategyId">The strategy that attempted the detection.</param>
@@ -119,6 +147,22 @@ namespace CitrixAI.Core.Models
                 0.0,
                 processingTime,
                 imageQuality: imageQuality);
+        }
+
+        /// <inheritdoc />
+        public string ErrorMessage
+        {
+            get
+            {
+                if (IsSuccessful) return null;
+
+                // Try to get error from metadata first
+                if (_metadata.ContainsKey("Error"))
+                    return _metadata["Error"]?.ToString();
+
+                // Fallback to first warning
+                return _warnings.FirstOrDefault() ?? "Unknown error occurred";
+            }
         }
 
         /// <summary>

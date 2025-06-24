@@ -20,6 +20,8 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using CitrixAI.Core.Utilities;
 using System.Collections.Generic;
+using CitrixAI.Detection.Tests;
+using System.Reflection;
 
 namespace CitrixAI.Demo.ViewModels
 {
@@ -31,6 +33,8 @@ namespace CitrixAI.Demo.ViewModels
     {
         #region Private Fields
 
+        private EnhancedDetectionStrategy _enhancedStrategy;
+        private Segment3IntegrationTest _segment3Test;
         private DetectionOrchestrator _detectionOrchestrator;
         private ScreenshotCapture _screenshotCapture;
         private BitmapImage _currentImage;
@@ -243,6 +247,12 @@ namespace CitrixAI.Demo.ViewModels
         public ICommand ExitCommand { get; private set; }
 
         public ICommand RunSegment1TestCommand { get; private set; }
+        public ICommand TestSegment3Command => new RelayCommand(async () => await TestSegment3ImplementationAsync());
+        public ICommand RunEnhancedDetectionCommand => new RelayCommand(async () => await RunEnhancedDetectionAsync());
+
+        public ICommand DemoContextAnalysisCommand => new RelayCommand(DemoContextAnalysis);
+        public ICommand DemoPatternRecognitionCommand => new RelayCommand(DemoPatternRecognition);
+        public ICommand DemoRobustTemplateMatchingCommand => new RelayCommand(DemoRobustTemplateMatching);
 
         #endregion
 
@@ -621,10 +631,18 @@ namespace CitrixAI.Demo.ViewModels
                 // Process results
                 ProcessDetectionResult(result);
 
-                LogMessage($"AI Detection completed in {DetectionTime:F0}ms");
-                LogMessage($"Found {result.DetectedElements.Count} elements with confidence {result.OverallConfidence:F2}");
-
-                StatusMessage = $"AI Detection completed - {result.DetectedElements.Count} elements found";
+                if (result.IsSuccessful)
+                {
+                    LogMessage($"AI Detection completed in {DetectionTime:F0}ms");
+                    LogMessage($"Found {result.DetectedElements.Count} elements with confidence {result.OverallConfidence:F2}");
+                    StatusMessage = $"AI Detection completed - {result.DetectedElements.Count} elements found";
+                }
+                else
+                {
+                    var errorMsg = GetErrorMessage(result);
+                    LogMessage($"AI Detection failed: {errorMsg}");
+                    StatusMessage = "AI Detection failed";
+                }
             }
             catch (Exception ex)
             {
@@ -723,6 +741,278 @@ namespace CitrixAI.Demo.ViewModels
             return CurrentImage != null && !IsProcessing;
         }
 
+        private async Task TestSegment3ImplementationAsync()
+        {
+            if (IsProcessing) return;
+
+            try
+            {
+                IsProcessing = true;
+                StatusMessage = "Running Day 4 Segment 3 integration tests...";
+
+                LogMessage("Starting Day 4 Segment 3 - Detection Enhancement & Context Intelligence Test");
+
+                var testResults = await _segment3Test.RunComprehensiveTestAsync();
+
+                LogMessage($"Test Results Summary:");
+                LogMessage($"Total Execution Time: {testResults.TotalExecutionTime.TotalSeconds:F1} seconds");
+                LogMessage($"Overall Success Rate: {testResults.OverallSuccess:P1}");
+
+                if (!string.IsNullOrEmpty(testResults.ErrorMessage))
+                {
+                    LogMessage($"Error: {testResults.ErrorMessage}");
+                }
+
+                LogComponentResults("Contextual Detection", testResults.ContextualDetectionResults);
+                LogComponentResults("UI Pattern Recognition", testResults.PatternRecognitionResults);
+                LogComponentResults("Robust Template Matching", testResults.TemplateMatchingResults);
+                LogComponentResults("Enhanced Detection Strategy", testResults.IntegrationResults);
+                LogComponentResults("Performance & Accuracy", testResults.PerformanceResults);
+
+                if (testResults.OverallSuccess >= 0.8)
+                {
+                    LogMessage("Day 4 Segment 3 implementation successful!");
+                    LogMessage("Enhanced detection features are now available");
+                    StatusMessage = "Enhanced detection ready - improved accuracy and context intelligence enabled";
+                }
+                else
+                {
+                    LogMessage("Some Segment 3 features may not be fully operational");
+                    StatusMessage = "Enhanced detection partially ready - check logs for details";
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Segment 3 test failed: {ex.Message}");
+                StatusMessage = "Enhanced detection test failed";
+            }
+            finally
+            {
+                IsProcessing = false;
+            }
+        }
+
+        private async Task RunEnhancedDetectionAsync()
+        {
+            if (IsProcessing || CurrentImage == null) return;
+
+            try
+            {
+                IsProcessing = true;
+                StatusMessage = "Running enhanced context-aware detection...";
+                LogMessage("Running enhanced detection with context analysis...");
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+                // Convert BitmapImage to Bitmap for detection
+                using (var bitmap = BitmapImageToBitmap(CurrentImage))
+                {
+                    LogMessage($"Image size: {bitmap.Width}x{bitmap.Height}");
+
+                    var context = new DetectionContext(
+                        bitmap,
+                        new ElementSearchCriteria(),
+                        new EnvironmentInfo());
+
+                    LogMessage("Starting enhanced detection strategy...");
+                    var result = await _enhancedStrategy.DetectAsync(context);
+                    stopwatch.Stop();
+
+                    LogMessage($"Detection completed. Success: {result.IsSuccessful}");
+
+                    if (result.IsSuccessful)
+                    {
+                        DetectionTime = stopwatch.Elapsed.TotalMilliseconds;
+                        ElementsFound = result.DetectedElements.Count;
+
+                        LogMessage($"Enhanced detection completed in {DetectionTime:F0}ms");
+                        LogMessage($"Elements detected: {ElementsFound}");
+
+                        LogEnhancedMetadata(result.Metadata);
+
+                        // Update detection results for display
+                        UpdateDetectionResults(result.DetectedElements.ToList());
+
+                        StatusMessage = $"Enhanced detection complete - {ElementsFound} elements found";
+                    }
+                    else
+                    {
+                        var errorMsg = GetErrorMessage(result);
+                        LogMessage($"Enhanced detection failed: {errorMsg}");
+                        LogMessage($"Warnings: {string.Join(", ", result.Warnings)}");
+                        StatusMessage = "Enhanced detection failed";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Enhanced detection error: {ex.Message}");
+                LogMessage($"Stack trace: {ex.StackTrace}");
+                StatusMessage = "Enhanced detection error occurred";
+            }
+            finally
+            {
+                IsProcessing = false;
+            }
+        }
+
+        private void DemoContextAnalysis()
+        {
+            LogMessage("Demonstrating Context Analysis...");
+            LogMessage("Context analysis improves detection by:");
+            LogMessage("• Analyzing spatial relationships between elements");
+            LogMessage("• Boosting confidence for elements that fit expected patterns");
+            LogMessage("• Filtering out false positives based on contextual rules");
+            LogMessage("• Adjusting confidence scores based on surrounding elements");
+
+            if (CurrentImage != null)
+            {
+                RunEnhancedDetectionCommand.Execute(null);
+            }
+            else
+            {
+                LogMessage("Load an image to see context analysis in action");
+            }
+        }
+
+        private void DemoPatternRecognition()
+        {
+            LogMessage("Demonstrating UI Pattern Recognition...");
+            LogMessage("Pattern recognition identifies common UI layouts:");
+            LogMessage("• Form patterns (labels + inputs + buttons)");
+            LogMessage("• Dialog patterns (message + action buttons)");
+            LogMessage("• Menu patterns (horizontal/vertical menu items)");
+            LogMessage("• Toolbar patterns (button groups)");
+            LogMessage("• Grid patterns (table cells)");
+
+            if (CurrentImage != null)
+            {
+                LogMessage("Analyzing current image for UI patterns...");
+                RunEnhancedDetectionCommand.Execute(null);
+            }
+            else
+            {
+                LogMessage("Load an image to see pattern recognition in action");
+            }
+        }
+
+        private void DemoRobustTemplateMatching()
+        {
+            LogMessage("Demonstrating Robust Template Matching...");
+            LogMessage("Robust template matching provides:");
+            LogMessage("• Multi-scale detection (0.8x to 1.2x scale factors)");
+            LogMessage("• Rotation compensation (±15 degrees)");
+            LogMessage("• Feature-based matching for difficult cases");
+            LogMessage("• Template quality evaluation and optimization");
+            LogMessage("• Non-maximum suppression to remove duplicates");
+
+            if (CurrentImage != null)
+            {
+                LogMessage("Running robust template matching on current image...");
+                RunEnhancedDetectionCommand.Execute(null);
+            }
+            else
+            {
+                LogMessage("Load an image to see robust template matching in action");
+            }
+        }
+
+        private string GetErrorMessage(IDetectionResult result)
+        {
+            // Try to get error from metadata
+            if (result.Metadata?.ContainsKey("Error") == true)
+            {
+                return result.Metadata["Error"]?.ToString();
+            }
+
+            // Try to get error from warnings
+            if (result.Warnings?.Any() == true)
+            {
+                return result.Warnings.First();
+            }
+
+            // Fallback message
+            return "Detection failed for unknown reason";
+        }
+
+        private void LogComponentResults(string componentName, ComponentTestResult results)
+        {
+            if (results == null) return;
+
+            LogMessage($"{componentName}: {(results.Success ? "PASS" : "FAIL")} ({results.SuccessRate:P0})");
+
+            if (!string.IsNullOrEmpty(results.ErrorMessage))
+            {
+                LogMessage($"  Error: {results.ErrorMessage}");
+            }
+
+            foreach (var testCase in results.TestCases)
+            {
+                var status = testCase.Success ? "PASS" : "FAIL";
+                LogMessage($"  {status} {testCase.Name}: {testCase.Details} ({testCase.ExecutionTime.TotalMilliseconds:F0}ms)");
+            }
+        }
+
+        private void LogEnhancedMetadata(IDictionary<string, object> metadata)
+        {
+            if (metadata == null) return;
+
+            LogMessage("Enhanced Detection Details:");
+
+            if (metadata.ContainsKey("TemplateMatchesFound"))
+                LogMessage($"  Template matches: {metadata["TemplateMatchesFound"]}");
+
+            if (metadata.ContainsKey("ContextAnalysisApplied"))
+                LogMessage($"  Context analysis applied: {metadata["ContextAnalysisApplied"]}");
+
+            if (metadata.ContainsKey("AverageConfidence"))
+                LogMessage($"  Average confidence: {metadata["AverageConfidence"]:F2}");
+
+            if (metadata.ContainsKey("ElementTypeDistribution"))
+            {
+                LogMessage("  Element distribution:");
+                if (metadata["ElementTypeDistribution"] is IDictionary<string, int> distribution)
+                {
+                    foreach (var kvp in distribution)
+                    {
+                        LogMessage($"    {kvp.Key}: {kvp.Value}");
+                    }
+                }
+            }
+        }
+
+        private Bitmap BitmapImageToBitmap(BitmapImage bitmapImage)
+        {
+            using (var outStream = new MemoryStream())
+            {
+                BitmapEncoder enc = new BmpBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bitmapImage));
+                enc.Save(outStream);
+                var bitmap = new Bitmap(outStream);
+                return new Bitmap(bitmap);
+            }
+        }
+
+        private void UpdateDetectionResults(IList<IElementInfo> elements)
+        {
+            DetectionResults.Clear();
+
+            foreach (var element in elements)
+            {
+                // Use the existing constructor that takes IElementInfo
+                var resultViewModel = new DetectionResultViewModel(element)
+                {
+                    IsEnhanced = element.Properties?.ContainsKey("ContextuallyAdjusted") == true ||
+                                element.Properties?.ContainsKey("TemplateId") == true
+                };
+
+                DetectionResults.Add(resultViewModel);
+            }
+
+            OnPropertyChanged(nameof(DetectionResults));
+        }
+
+
         #endregion
 
         #region Public Methods
@@ -752,6 +1042,9 @@ namespace CitrixAI.Demo.ViewModels
             LogMessage("Starting advanced detection system initialization...");
             try
             {
+
+                _enhancedStrategy = new EnhancedDetectionStrategy();
+                _segment3Test = new Segment3IntegrationTest();
                 // Initialize advanced cache
                 _advancedCache = new AdvancedDetectionCache(maxEntries: 100, similarityThreshold: 0.85);
                 LogMessage("Advanced detection cache initialized with perceptual hashing");
@@ -769,6 +1062,7 @@ namespace CitrixAI.Demo.ViewModels
 
                 // Also keep the basic orchestrator for comparison
                 _detectionOrchestrator = new DetectionOrchestrator(cache: _advancedCache);
+                _detectionOrchestrator.RegisterStrategy(_enhancedStrategy);
                 _screenshotCapture = new ScreenshotCapture();
 
                 // Initialize performance monitoring
@@ -973,6 +1267,7 @@ namespace CitrixAI.Demo.ViewModels
             _screenshotCapture?.Dispose();
             _advancedCache?.Dispose();
             _performanceMonitor?.Dispose();
+            _segment3Test?.Dispose();
         }
 
         #endregion
